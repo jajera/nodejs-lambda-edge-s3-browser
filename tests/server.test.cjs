@@ -1,26 +1,39 @@
 const http = require('http');
 const assert = require('assert');
+const { spawn } = require('child_process');
 
-// 🔁 Start the server
-require('../server.cjs');
+const server = spawn('node', ['server.cjs'], {
+  stdio: ['ignore', 'inherit', 'inherit'],
+});
 
-const req = http.request({
+setTimeout(() => {
+  const req = http.request({
     hostname: 'localhost',
     port: 3000,
     path: '/browser?prefix=',
     method: 'GET'
-}, res => {
+  }, res => {
     let data = '';
     res.on('data', chunk => data += chunk);
     res.on('end', () => {
+      try {
         assert.strictEqual(res.statusCode, 200);
         assert.ok(data.includes('Index of'));
         console.log('✅ Passed: /browser?prefix= returns 200');
+      } catch (err) {
+        console.error('❌ Test failed:', err);
+        process.exitCode = 1;
+      } finally {
+        server.kill(); // ✅ kill the server process after test
+      }
     });
-});
+  });
 
-req.on('error', err => {
+  req.on('error', err => {
     console.error('❌ Error:', err);
-});
+    server.kill();
+    process.exit(1);
+  });
 
-req.end();
+  req.end();
+}, 1000); // Wait 1 second to ensure server is ready
